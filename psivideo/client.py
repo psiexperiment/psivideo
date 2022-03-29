@@ -8,12 +8,17 @@ import websockets
 
 class VideoClient:
 
-    def __init__(self, uri='ws://localhost:33331'):
+    def __init__(self, uri='ws://localhost:33331', launch=True):
+        self.launch = launch
         self.uri = uri
-        self.loop = asyncio.new_event_loop()
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = asyncio.new_event_loop()
 
     async def connect(self):
-        process = subprocess.Popen(['psivideo'], stdout=subprocess.PIPE)
+        if self.launch:
+            process = subprocess.Popen(['psivideo'], stdout=subprocess.PIPE)
         self.ws = await websockets.connect(self.uri, loop=self.loop)
         print(f'Connected to {self.uri}')
 
@@ -68,25 +73,3 @@ class SyncVideoClient(VideoClient):
 
     def get_frames_written(self):
         return self.loop.run_until_complete(super().get_frames_written())
-
-
-async def async_test_client():
-    async with VideoClient('ws://localhost:33331') as client:
-        await client.start('c:/users/lbhb/Desktop/test.avi')
-        while True:
-            await asyncio.sleep(1)
-            print(await client.get_frames_written())
-
-
-def sync_test_client():
-    with SyncVideoClient('ws://localhost:33331') as client:
-        time.sleep(2)
-        client.start('c:/users/lbhb/Desktop/test.avi')
-        while True:
-            time.sleep(1)
-            print(client.get_frames_written())
-
-
-
-if __name__ == '__main__':
-    sync_test_client()
