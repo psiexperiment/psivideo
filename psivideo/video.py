@@ -4,6 +4,7 @@ import queue
 from .capture import video_capture
 from .display import video_display
 from .tcp import video_tcp
+from .process import video_process
 from .write import video_write
 
 
@@ -19,6 +20,7 @@ class Video:
         self.write_start = None
 
         # Thread synchronization
+        self.process_queue = queue.Queue()
         self.write_queue = queue.Queue()
         self.stop = Event()
         self.new_frame = Event()
@@ -27,15 +29,21 @@ class Video:
     def start(self):
         self._threads = {
             'capture': Thread(target=video_capture, args=(self,)),
+            'process': Thread(target=video_process, args=(self,)),
             'display': Thread(target=video_display, args=(self,)),
             'write': Thread(target=video_write, args=(self,)),
-            'tcp': Thread(target=video_tcp, args=(self,), daemon=True),
+            'tcp': Thread(target=video_tcp, args=(self,)),
         }
         for thread in self._threads.values():
             thread.start()
 
     def join(self):
         self._threads['capture'].join()
+
+    def process_frame(self, ts, frame):
+        # Passthrough, but this method makes it easy for users to subclass and
+        # write their own custom processing functions.
+        return ts, frame
 
     def dispatch(self, cmd, **kwargs):
         return getattr(self, f'handle_{cmd}')(**kwargs)
