@@ -15,7 +15,7 @@ def video_write(video):
     try:
         print(f'Recording to {video.output_filename}')
         container = av.open(video.output_filename, mode='w')
-        stream = container.add_stream('ffv1', rate=24)
+        stream = container.add_stream('mpeg4', rate=24)
         stream.width, stream.height = 640, 480
         stream.codec_context.time_base = Fraction(1, 1000)
 
