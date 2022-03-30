@@ -13,7 +13,7 @@ class Video:
     def __init__(self, source=0, hostname='localhost', port=33331, filename=None):
         vars(self).update(locals())
         self.current_frame = None
-        self.output_filename = 'test/test.avi'
+        self.output_filename = None
         self.frames_captured = 0
         self.frames_written = 0
         self.frames_discarded = 0
@@ -63,3 +63,8 @@ class Video:
         if not self.recording.is_set():
             raise IOError('Recording has not started')
         return self.frames_captured - self.write_start
+
+    def handle_stop(self):
+        self.stop.set()
+        self.join()
+

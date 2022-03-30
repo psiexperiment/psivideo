@@ -32,25 +32,22 @@ class VideoClient:
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self.disconnect()
 
+    async def dispatch(self, cmd, **kwargs):
+        await self.ws.send(json.dumps((cmd, kwargs)))
+        error, result = json.loads(await self.ws.recv())
+        if error is not None:
+            raise ValueError(f'Error running {cmd}: {error}')
+        return result
+
     async def start(self, filename):
-        await self.ws.send(json.dumps({'cmd': 'set_filename', 'filename': filename}))
-        await self.ws.send(json.dumps({'cmd': 'start'}))
-        result = json.loads(await self.ws.recv())
-        if result is not None:
-            raise ValueError(f'Error starting: {result}')
-        result = json.loads(await self.ws.recv())
-        if result is not None:
-            raise ValueError(f'Error starting: {result}')
+        await self.dispatch('set_filename', filename=str(filename))
+        await self.dispatch('start')
+
+    async def stop(self):
+        return await self.dispatch('stop')
 
     async def get_frames_written(self):
-        _, result = await asyncio.gather(
-            self.ws.send(json.dumps({'cmd': 'get_frames_written'})),
-            self.ws.recv()
-        )
-        try:
-            return json.loads(result)
-        except:
-            raise ValueError('Error getting frames written: {result}')
+        return await self.dispatch('get_frames_written')
 
 
 class SyncVideoClient(VideoClient):
@@ -70,6 +67,9 @@ class SyncVideoClient(VideoClient):
 
     def start(self, filename):
         return self.loop.run_until_complete(super().start(filename))
+
+    def stop(self):
+        return self.loop.run_until_complete(super().stop())
 
     def get_frames_written(self):
         return self.loop.run_until_complete(super().get_frames_written())
