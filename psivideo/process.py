@@ -17,6 +17,7 @@ def video_process(video):
                 if video.recording.is_set():
                     video.frames_captured += 1
                     video.write_queue.put_nowait((ts, frame))
+
             except queue.Empty:
                 if video.stop.is_set():
                     break

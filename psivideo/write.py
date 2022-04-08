@@ -18,10 +18,14 @@ def video_write(video):
         stream = container.add_stream('mpeg4', rate=24)
         stream.width, stream.height = 640, 480
         stream.codec_context.time_base = Fraction(1, 1000)
+        t0 = None
 
         while True:
             try:
                 ts, frame = video.write_queue.get(timeout=1)
+                if t0 is None:
+                    t0 = ts
+                ts -= t0
                 video.frames_written += 1
                 frame = av.VideoFrame.from_ndarray(frame[..., ::-1], format='rgb24')
                 frame.pts = int(round(ts / stream.codec_context.time_base))
