@@ -34,6 +34,10 @@ def video_write(video):
         video.stop.set()
         raise
     finally:
-        container.close()
+        try:
+            # If the error occured when creating the container, it won't exist!
+            container.close()
+        except:
+            pass
 
     print(f'Wrote {video.frames_written} frames.')
