@@ -1,3 +1,6 @@
+import logging
+log = logging.getLogger(__name__)
+
 import asyncio
 import json
 import subprocess
@@ -8,9 +11,10 @@ import websockets
 
 class VideoClient:
 
-    def __init__(self, uri='ws://localhost:33331', launch=True):
+    def __init__(self, uri='ws://localhost:33331', launch=True, logging=None):
         self.launch = launch
         self.uri = uri
+        self.logging = logging
         try:
             self.loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -18,11 +22,15 @@ class VideoClient:
 
     async def connect(self):
         if self.launch:
-            process = subprocess.Popen(['psivideo'], stdout=subprocess.PIPE)
+            args = ['psivideo']
+            if self.logging is not None:
+                args.extend(['--logging', self.logging])
+            process = subprocess.Popen(args)
         self.ws = await websockets.connect(self.uri, loop=self.loop)
-        print(f'Connected to {self.uri}')
+        log.info(f'Connected to {self.uri}')
 
     async def disconnect(self):
+        log.info('Closing websocket')
         await self.ws.close()
 
     async def __aenter__(self):
@@ -33,6 +41,7 @@ class VideoClient:
         await self.disconnect()
 
     async def dispatch(self, cmd, **kwargs):
+        log.info(f'Dispatching {cmd} with kwargs {kwargs}')
         await self.ws.send(json.dumps((cmd, kwargs)))
         error, result = json.loads(await self.ws.recv())
         if error is not None:
@@ -48,6 +57,9 @@ class VideoClient:
 
     async def get_frames_written(self):
         return await self.dispatch('get_frames_written')
+
+    async def get_timing(self):
+        return await self.dispatch('get_timing')
 
 
 class SyncVideoClient(VideoClient):
@@ -66,6 +78,7 @@ class SyncVideoClient(VideoClient):
         self.loop.run_until_complete(super().connect())
 
     def start(self, filename):
+        log.info('Starting')
         return self.loop.run_until_complete(super().start(filename))
 
     def stop(self):
@@ -73,3 +86,6 @@ class SyncVideoClient(VideoClient):
 
     def get_frames_written(self):
         return self.loop.run_until_complete(super().get_frames_written())
+
+    def get_timing(self):
+        return self.loop.run_until_complete(super().get_timing())

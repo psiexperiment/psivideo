@@ -15,7 +15,9 @@ def video_process(video):
 
                 # If recording, send to the write thread for saving to disk.
                 if video.recording.is_set():
-                    video.frames_captured += 1
+                    with video.lock:
+                        video.frames_captured += 1
+                        video.current_ts = ts
                     video.write_queue.put_nowait((ts, frame))
 
             except queue.Empty:
