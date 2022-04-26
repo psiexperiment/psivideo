@@ -19,7 +19,13 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
     log.info('Setting up capture')
 
     stream = cv2.VideoCapture(source)
-    stream.set(cv2.CAP_PROP_BUFFERSIZE, 0)
+    actual_fps = stream.get(cv2.CAP_PROP_FPS)
+    actual_buffer = stream.get(cv2.CAP_PROP_BUFFERSIZE)
+
+    log.info(f'Actual FPS {actual_fps}. Actual buffer {actual_buffer}')
+
+    # Interval between successive image captures
+    frame_period = 1 / actual_fps
 
     # For some reason, first capture is very slow. Let's just grab and discard
     # the frame to get it out of the way.
@@ -27,9 +33,8 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
 
     # We need to track the actual capture time since the rate is a bit
     # variable. The video muxer we use can handle variable framerates. t0 is
-    # time since the beginning of the video. t1 is the time of the current
-    # frame. t2 is used to track the approximate frame rate.
-    t1 = t0 = time.time()
+    # time since the beginning of the video.
+    t0 = stream.get(cv2.CAP_PROP_POS_MSEC) * 1e-3
     n_frames = 0
 
     log.info('Starting capture loop')
@@ -42,7 +47,7 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
             # retrieve, but this approach (splitting the two) should yield more
             # accurate acquisition timestamps.
             grabbed = stream.grab()
-            t2 = time.time()
+            capture_ts = stream.get(cv2.CAP_PROP_POS_MSEC) * 1e-3 - t0
             if not grabbed:
                 # Something is wrong with the video camera interface
                 break
@@ -53,17 +58,11 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
                 break
 
             n_frames += 1
-            capture_ts = t2-t0
             queue.put_nowait((capture_ts, frame))
 
             if prev_capture_ts is not None:
                 log.info(f'Capture delta {(capture_ts - prev_capture_ts) * 1e3:.0f} msec')
             prev_capture_ts = capture_ts
-
-            #if (n_frames % 500) == 0:
-            #    fps = 500 / (t2-t1)
-            #    t1 = t2
-            #    log.info(f'Estimated FPS: {fps:.0f}')
 
         except Exception as e:
             # Notify other threads that it's time to stop.
@@ -71,7 +70,7 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
             stop.set()
             raise
 
-    fps = n_frames / (t2-t0)
+    fps = n_frames / capture_ts
     log.info(f'Captured {n_frames} frames. Estimated capture rate was {fps:.0f} FPS')
 
 
