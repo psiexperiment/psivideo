@@ -10,7 +10,7 @@ def video_capture_profile(*args):
     lp.print_stats()
 
 
-def _video_capture(source, queue, capture_started, stop, log_cb):
+def _video_capture(ctx, queue, capture_started, stop, log_cb):
     '''
     Function to execute in a thread that captures video. Basic tests suggest
     threading is enough and we do not need to go to multiprocessing for speed.
@@ -18,14 +18,14 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
     log = log_cb()
     log.info('Setting up capture')
 
-    stream = cv2.VideoCapture(source)
-    actual_fps = stream.get(cv2.CAP_PROP_FPS)
-    actual_buffer = stream.get(cv2.CAP_PROP_BUFFERSIZE)
+    stream = cv2.VideoCapture(ctx.source)
 
-    log.info(f'Actual FPS {actual_fps}. Actual buffer {actual_buffer}')
+    # Read in some attributes that will be needed later
+    ctx.fps = stream.get(cv2.CAP_PROP_FPS)
+    ctx.image_width = stream.get(cv2.CAP_PROP_FRAME_WIDTH)
+    ctx.image_height = stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-    # Interval between successive image captures
-    frame_period = 1 / actual_fps
+    log.info(f'Actual FPS {ctx.fps}')
 
     # For some reason, first capture is very slow. Let's just grab and discard
     # the frame to get it out of the way.
@@ -37,33 +37,27 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
     t0 = stream.get(cv2.CAP_PROP_POS_MSEC) * 1e-3
     n_frames = 0
 
+    # Notify the parent thread/process that capture is ready to go. This
+    # prevents any other operations from beginning until capture is up and
+    # running.
     log.info('Starting capture loop')
     capture_started.set()
 
-    prev_capture_ts = None
     while True:
         try:
-            # We can use the stream.read method which combines grab and
-            # retrieve, but this approach (splitting the two) should yield more
-            # accurate acquisition timestamps.
-            grabbed = stream.grab()
+            # CAP_PROP_POS_MSEC is more accurate than time.time()
+            grabbed, frame = stream.read()
             capture_ts = stream.get(cv2.CAP_PROP_POS_MSEC) * 1e-3 - t0
             if not grabbed:
                 # Something is wrong with the video camera interface
                 break
-
-            _, frame = stream.retrieve()
             if stop.is_set():
                 # Time to stop the video
                 break
 
             n_frames += 1
             queue.put_nowait((capture_ts, frame))
-
-            if prev_capture_ts is not None:
-                log.info(f'Capture delta {(capture_ts - prev_capture_ts) * 1e3:.0f} msec')
-            prev_capture_ts = capture_ts
-
+            ctx.capture_ts = capture_ts
         except Exception as e:
             # Notify other threads that it's time to stop.
             log.error(str(e))
@@ -74,4 +68,5 @@ def _video_capture(source, queue, capture_started, stop, log_cb):
     log.info(f'Captured {n_frames} frames. Estimated capture rate was {fps:.0f} FPS')
 
 
-video_capture = video_capture_profile
+# This allows us to switch between the line_profiler and regula version of video_capture
+video_capture = _video_capture

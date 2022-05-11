@@ -4,7 +4,7 @@ import queue
 import av
 
 
-def video_write(ctx, write_queue, recording, stop, time_base, log_cb):
+def video_write(ctx, write_queue, recording, stop, log_cb):
     log = log_cb()
     log.info('Setting up write')
 
@@ -14,15 +14,16 @@ def video_write(ctx, write_queue, recording, stop, time_base, log_cb):
         if stop.is_set():
             return
 
-    prior_pts = 0
+    frames_written = 0
+    total_frames_dropped = 0
+    prior_pts = -1
+    fps = ctx.fps
     # Ok, it's time to start writing video!
     try:
         log.info(f'Recording to {ctx.output_filename}')
         container = av.open(ctx.output_filename, mode='w')
-        stream = container.add_stream('mpeg4', rate=24)
-        stream.width, stream.height = 640, 480
-        stream.codec_context.time_base = time_base
-        log.info(f'Time base is {stream.codec_context.time_base}')
+        stream = container.add_stream('mpeg4', rate=fps)
+        stream.width, stream.height = ctx.image_width, ctx.image_height
 
         while True:
             try:
@@ -30,13 +31,20 @@ def video_write(ctx, write_queue, recording, stop, time_base, log_cb):
                 if ctx.write_t0 is None:
                     ctx.write_t0 = ts
                 ts -= ctx.write_t0
-                ctx.frames_written += 1
                 frame = av.VideoFrame.from_ndarray(frame[..., ::-1], format='rgb24')
-                frame.pts = int(round(ts / stream.codec_context.time_base))
-                #log.debug(f'PTS is {frame.pts} (ts={ts:.3f}), DELTA={frame.pts-prior_pts}')
-                prior_pts = frame.pts
-                for packet in stream.encode(frame):
-                    container.mux(packet)
+
+                current_pts = int(round(ts * fps))
+                if (current_pts - prior_pts) != 1:
+                    frames_dropped = current_pts - prior_pts - 1
+                    log.warning(f'Dropped {frames_dropped} frames before frame {current_pts}.')
+                    total_frames_dropped += frames_dropped
+                for pts in range(prior_pts, current_pts):
+                    frames_written += 1
+                    frame.pts = pts + 1
+                    for packet in stream.encode(frame):
+                        container.mux(packet)
+                prior_pts = current_pts
+
             except queue.Empty:
                 log.error('Queue is empty!')
                 if stop.is_set():
@@ -52,4 +60,5 @@ def video_write(ctx, write_queue, recording, stop, time_base, log_cb):
         except:
             pass
 
-    print(f'Wrote {ctx.frames_written} frames.')
+    log.info(f'{total_frames_dropped} dropped frames.')
+    log.info(f'Wrote {frames_written} frames.')

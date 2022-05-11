@@ -47,13 +47,11 @@ class Video:
         multiply PTS by timebase.
     '''
 
-    def __init__(self, source=0, hostname='localhost', port=33331,
-                 time_base=Fraction(1, 120)):
+    def __init__(self, source=0, hostname='localhost', port=33331):
         # TODO: Don't use indexing for source. Should always point to correct
         # camera even if inputs are swapped.
         vars(self).update(locals())
         self.current_frame = None
-        self.frames_captured = 0
         self.frames_discarded = 0
 
         # Process synchronization
@@ -63,26 +61,25 @@ class Video:
         self.recording = mp.Event()         # Indicates whether we are saving video.
         self.write_queue = mp.Queue(-1)     # Process function puts frames/timestamp here.
 
-        self.write_mgr = mp.Manager()
-        self.write_ctx = self.write_mgr.Namespace()
-        self.write_ctx.output_filename = None
-        self.write_ctx.write_start = None
-        self.write_ctx.write_t0 = None
-        self.write_ctx.frames_written = 0
+        # This manages a set of variables that are shared globally
+        self.mgr = mp.Manager()
+        self.ctx = self.mgr.Namespace()
+        self.ctx.source = source
+        self.ctx.output_filename = None
+        self.ctx.write_start = None
+        self.ctx.write_t0 = None
 
         # Thread synchronization
         self.new_frame = mp.Event()
-        self.lock = mp.Lock()
-
 
     def start(self):
         log_queue = mp.Queue(-1)
         log_cb = partial(configure_worker_logging, log_queue)
 
-        capture_args = (self.source, self.process_queue, self.capture_started,
+        capture_args = (self.ctx, self.process_queue, self.capture_started,
                         self.stop, log_cb)
-        write_args = (self.write_ctx, self.write_queue, self.recording,
-                      self.stop, self.time_base, log_cb)
+        write_args = (self.ctx, self.write_queue, self.recording, self.stop,
+                      log_cb)
 
         self._threads = {
             'capture': mp.Process(target=video_capture, name='capture', args=capture_args),
@@ -107,34 +104,40 @@ class Video:
         # write their own custom processing functions. Deeplabcut anyone?
         return ts, frame
 
+    @property
+    def ts(self):
+        return self.ctx.capture_ts - self.ctx.write_t0
+
+    @property
+    def frames_written(self):
+        return self.ts * self.ctx.fps
+
     def dispatch(self, cmd, **kwargs):
-        log.info(f'Recieved {cmd} with kwargs {kwargs}')
         return getattr(self, f'handle_{cmd}')(**kwargs)
 
     def handle_set_filename(self, filename):
         if self.recording.is_set():
             raise IOError('Recording already started. Cannot set filename.')
-        self.write_ctx.output_filename = filename
+        self.ctx.output_filename = filename
 
     def handle_start(self):
         if self.recording.is_set():
             raise IOError('Recording already started.')
         self.recording.set()
-        self.write_start = self.frames_captured
 
     def handle_get_frames_written(self):
         if not self.recording.is_set():
             raise IOError('Recording has not started')
-        return self.frames_captured - self.write_start
+        return self.frames_written
 
     def handle_get_timing(self):
         if not self.recording.is_set():
             raise IOError('Recording has not started')
-        with self.lock:
-            return {
-                'frame_number': self.frames_captured - self.write_start,
-                'timestamp': self.current_ts - self.write_ctx.write_t0
-            }
+        ts = self.ts
+        return {
+            'frame_number': ts * self.ctx.fps,
+            'timestamp': ts
+        }
 
     def handle_stop(self):
         self.stop.set()
