@@ -1,0 +1,31 @@
+[project]
+name = "psivideo"
+description = "Video tools supporting psiexperiment that can also be used as a stand-alone client/server architecture by other programs."
+requires-python = ">=3.7"
+license = {file = "license.txt"}
+authors = [
+    {name = "Brad Buran", email="buran@ohsu.edu"},
+]
+maintainers = [
+    {name = "Brad Buran", email="buran@ohsu.edu"},
+]
+dependencies = [
+    "opencv-python",
+    "av",
+    "ffmpeg",
+    "websockets",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+psivideo = "psivideo.main:main"
+
+[build-system]
+requires = ["setuptools>=61.2", "wheel", "setuptools_scm[toml]>=3.4.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "psivideo/version.py"
