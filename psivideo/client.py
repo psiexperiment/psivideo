@@ -11,7 +11,7 @@ import websockets
 
 class VideoClient:
 
-    def __init__(self, uri='ws://localhost:33331', launch=True, logging=None):
+    def __init__(self, uri='ws://localhost:33331', launch=False, logging=None):
         self.launch = launch
         self.uri = uri
         self.logging = logging
