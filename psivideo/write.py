@@ -18,6 +18,7 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
     total_frames_dropped = 0
     prior_pts = -1
     fps = ctx.fps
+    #fps = 30
     # Ok, it's time to start writing video!
     try:
         log.info(f'Recording to {ctx.output_filename}')
@@ -34,21 +35,26 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
                 frame = av.VideoFrame.from_ndarray(frame[..., ::-1], format='rgb24')
 
                 current_pts = int(round(ts * fps))
-                if (current_pts - prior_pts) != 1:
+                if current_pts == prior_pts:
+                    log.info('Skipping write')
+                    continue
+                elif (current_pts - prior_pts) > 1:
                     frames_dropped = current_pts - prior_pts - 1
                     log.warning(f'Dropped {frames_dropped} frames before frame {current_pts}.')
                     total_frames_dropped += frames_dropped
                 for pts in range(prior_pts, current_pts):
                     frames_written += 1
                     frame.pts = pts + 1
-                    for packet in stream.encode(frame):
-                        container.mux(packet)
+                    log.error(f'Written {frames_written}')
+                    container.mux(stream.encode(frame))
                 prior_pts = current_pts
 
             except queue.Empty:
                 log.error('Queue is empty!')
                 if stop.is_set():
                     break
+    except BrokenPipeError:
+        pass
     except Exception as e:
         log.error(str(e))
         stop.set()
