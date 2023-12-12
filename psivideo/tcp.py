@@ -28,7 +28,7 @@ async def handle_connection(video, websocket):
 async def run_server(video, loop):
     cb = partial(handle_connection, video)
     async with websockets.serve(cb, video.hostname, video.port, loop=loop,
-                                ping_interval=None):
+                                ping_timeout=None):
         while True:
             await asyncio.sleep(0.1)
             if video.stop.is_set():

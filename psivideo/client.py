@@ -26,7 +26,8 @@ class VideoClient:
             if self.logging is not None:
                 args.extend(['--logging', self.logging])
             process = subprocess.Popen(args)
-        self.ws = await websockets.connect(self.uri, loop=self.loop)
+        self.ws = await websockets.connect(self.uri, loop=self.loop,
+                                           ping_timeout=None)
         log.info(f'Connected to {self.uri}')
 
     async def disconnect(self):
