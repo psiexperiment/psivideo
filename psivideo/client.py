@@ -11,10 +11,12 @@ import websockets
 
 class VideoClient:
 
-    def __init__(self, uri='ws://localhost:33331', launch=False, logging=None):
+    def __init__(self, launch=False, logging=None, hostname='localhost',
+                 port=33331):
         self.launch = launch
-        self.uri = uri
         self.logging = logging
+        self.hostname = hostname
+        self.port = port
         try:
             self.loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -22,13 +24,13 @@ class VideoClient:
 
     async def connect(self):
         if self.launch:
-            args = ['psivideo']
+            args = ['psivideo', '-p', self.port]
             if self.logging is not None:
                 args.extend(['--logging', self.logging])
             process = subprocess.Popen(args)
-        self.ws = await websockets.connect(self.uri, loop=self.loop,
-                                           ping_timeout=None)
-        log.info(f'Connected to {self.uri}')
+        uri = f'ws://{self.hostname}:{self.port}'
+        self.ws = await websockets.connect(uri, loop=self.loop, ping_timeout=None)
+        log.info(f'Connected to {uri}')
 
     async def disconnect(self):
         log.info('Closing websocket')

@@ -3,10 +3,10 @@ import asyncio
 
 
 async def async_test_client():
-    async with VideoClient('ws://localhost:33331') as client:
+    async with VideoClient(port=33332) as client:
         await client.start('c:/users/lbhb/Desktop/test.avi')
-        while True:
-            await asyncio.sleep(1)
+        for i in range(5):
+            await asyncio.sleep(5)
             print(await client.get_frames_written())
 
 

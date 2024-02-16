@@ -36,10 +36,13 @@ log_config = {
 
 
 def main():
-    #from argparse import ArgumentParser
-    #parser = ArgumentParser('psivideo')
+    from argparse import ArgumentParser
+    parser = ArgumentParser('psivideo')
+    parser.add_argument('-s', '--source', default=0, type=int)
+    parser.add_argument('-p', '--port', default=33331, type=int)
+    args = parser.parse_args()
     logging.config.dictConfig(log_config)
-    video = Video()
+    video = Video(source=args.source, port=args.port)
     video.start()
     video.join()
 
