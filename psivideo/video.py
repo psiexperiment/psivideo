@@ -5,6 +5,7 @@ log = logging.getLogger(__name__)
 
 from fractions import Fraction
 from functools import partial
+import importlib
 import multiprocessing as mp
 from threading import Event, Lock, Thread
 
@@ -12,7 +13,6 @@ from .capture import video_capture
 from .display import video_display
 from .tcp import video_tcp
 from .process import video_process
-from .write import video_write
 
 
 def configure_worker_logging(queue):
@@ -47,7 +47,7 @@ class Video:
         multiply PTS by timebase.
     '''
 
-    def __init__(self, source=0, hostname='localhost', port=33331):
+    def __init__(self, source=0, hostname='localhost', port=33331, writer='cv2'):
         # TODO: Don't use indexing for source. Should always point to correct
         # camera even if inputs are swapped.
         vars(self).update(locals())
@@ -72,6 +72,9 @@ class Video:
         # Thread synchronization
         self.new_frame = mp.Event()
 
+        module = importlib.import_module(f'psivideo.write_{writer}')
+        self.write_cb = getattr(module, 'video_write')
+
     def start(self):
         log_queue = mp.Queue(-1)
         log_cb = partial(configure_worker_logging, log_queue)
@@ -85,7 +88,7 @@ class Video:
             'capture': mp.Process(target=video_capture, name='capture', args=capture_args),
             'process': Thread(target=video_process, args=(self,)),
             'display': Thread(target=video_display, args=(self,)),
-            'write': mp.Process(target=video_write, name='write', args=write_args),
+            'write': mp.Process(target=self.write_cb, name='write', args=write_args),
             'tcp': Thread(target=video_tcp, args=(self,)),
             'log': Thread(target=logging_thread, args=(log_queue,),
                           daemon=True),

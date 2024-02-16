@@ -1,7 +1,7 @@
 from fractions import Fraction
 import queue
 
-import av
+import cv2
 
 
 def video_write(ctx, write_queue, recording, stop, log_cb):
@@ -17,14 +17,16 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
     frames_written = 0
     total_frames_dropped = 0
     prior_pts = -1
-    fps = ctx.fps
-    #fps = 30
+    fps = int(ctx.fps)
+    frame_size = int(ctx.image_width), int(ctx.image_height)
     # Ok, it's time to start writing video!
     try:
-        log.info(f'Recording to {ctx.output_filename}')
-        container = av.open(ctx.output_filename, mode='w')
-        stream = container.add_stream('mpeg4', rate=fps)
-        stream.width, stream.height = ctx.image_width, ctx.image_height
+        log.info(f'Recording to {ctx.output_filename} with fps {fps} and frame size {frame_size}')
+
+        out = cv2.VideoWriter(ctx.output_filename,
+                              cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'),
+                              fps,
+                              frame_size)
 
         while True:
             try:
@@ -32,7 +34,6 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
                 if ctx.write_t0 is None:
                     ctx.write_t0 = ts
                 ts -= ctx.write_t0
-                frame = av.VideoFrame.from_ndarray(frame[..., ::-1], format='rgb24')
 
                 current_pts = int(round(ts * fps))
                 if current_pts == prior_pts:
@@ -44,8 +45,7 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
                     total_frames_dropped += frames_dropped
                 for pts in range(prior_pts, current_pts):
                     frames_written += 1
-                    frame.pts = pts + 1
-                    container.mux(stream.encode(frame))
+                    out.write(frame)
                 prior_pts = current_pts
 
             except queue.Empty:
@@ -61,7 +61,7 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
     finally:
         try:
             # If the error occured when creating the container, it won't exist!
-            container.close()
+            out.release()
         except:
             pass
 
