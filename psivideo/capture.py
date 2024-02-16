@@ -21,8 +21,6 @@ def _video_capture(ctx, queue, capture_started, stop, log_cb):
     stream = cv2.VideoCapture(ctx.source)
     stream.set(cv2.CAP_PROP_FPS, 30.0)
     stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
-    stream.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
     # Read in some attributes that will be needed later
     ctx.fps = stream.get(cv2.CAP_PROP_FPS)
