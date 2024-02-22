@@ -1,4 +1,3 @@
-from fractions import Fraction
 import queue
 
 import cv2
@@ -8,17 +7,12 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
     log = log_cb()
     log.info('Setting up write')
 
-    while True:
-        if recording.wait(0.1):
-            break
-        if stop.is_set():
-            return
-
     frames_written = 0
     total_frames_dropped = 0
     prior_pts = -1
     fps = int(ctx.fps)
     frame_size = int(ctx.image_width), int(ctx.image_height)
+
     # Ok, it's time to start writing video!
     try:
         log.info(f'Recording to {ctx.output_filename} with fps {fps} and frame size {frame_size}')
@@ -52,11 +46,14 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
                 log.error('Queue is empty!')
                 if stop.is_set():
                     break
+                if not recording.is_set():
+                    break
     except BrokenPipeError:
         pass
     except Exception as e:
         log.error(str(e))
         stop.set()
+        recording.clear()
         raise
     finally:
         try:

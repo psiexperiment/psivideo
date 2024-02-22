@@ -1,4 +1,3 @@
-from fractions import Fraction
 import queue
 
 import av
@@ -8,17 +7,10 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
     log = log_cb()
     log.info('Setting up write')
 
-    while True:
-        if recording.wait(0.1):
-            break
-        if stop.is_set():
-            return
-
     frames_written = 0
     total_frames_dropped = 0
     prior_pts = -1
     fps = ctx.fps
-    #fps = 30
     # Ok, it's time to start writing video!
     try:
         log.info(f'Recording to {ctx.output_filename}')

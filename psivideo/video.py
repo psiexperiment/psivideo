@@ -13,6 +13,7 @@ from .capture import video_capture
 from .display import video_display
 from .tcp import video_tcp
 from .process import video_process
+from .write import video_write
 
 
 def configure_worker_logging(queue):
@@ -66,7 +67,6 @@ class Video:
         self.ctx = self.mgr.Namespace()
         self.ctx.source = source
         self.ctx.output_filename = None
-        self.ctx.write_start = None
         self.ctx.write_t0 = None
 
         # Thread synchronization
@@ -74,24 +74,20 @@ class Video:
 
         module = importlib.import_module(f'psivideo.write_{writer}')
         self.write_cb = getattr(module, 'video_write')
+        self.log_queue = mp.Queue(-1)
 
     def start(self):
-        log_queue = mp.Queue(-1)
-        log_cb = partial(configure_worker_logging, log_queue)
-
-        capture_args = (self.ctx, self.process_queue, self.capture_started,
-                        self.stop, log_cb)
-        write_args = (self.ctx, self.write_queue, self.recording, self.stop,
-                      log_cb)
+        log_cb = partial(configure_worker_logging, self.log_queue)
+        capture_args = (self.ctx, self.process_queue, self.capture_started, self.stop, log_cb)
+        write_args = (self.ctx, self.write_queue, self.recording, self.stop, log_cb, self.write_cb)
 
         self._threads = {
             'capture': mp.Process(target=video_capture, name='capture', args=capture_args),
             'process': Thread(target=video_process, args=(self,)),
             'display': Thread(target=video_display, args=(self,)),
-            'write': mp.Process(target=self.write_cb, name='write', args=write_args),
+            'write': mp.Process(target=video_write, name='write', args=write_args),
             'tcp': Thread(target=video_tcp, args=(self,)),
-            'log': Thread(target=logging_thread, args=(log_queue,),
-                          daemon=True),
+            'log': Thread(target=logging_thread, args=(self.log_queue,), daemon=True),
         }
         for name, thread in self._threads.items():
             log.info(f'Starting {thread}')
@@ -123,9 +119,13 @@ class Video:
             raise IOError('Recording already started. Cannot set filename.')
         self.ctx.output_filename = filename
 
-    def handle_start(self):
+    def handle_start(self, force=True):
         if self.recording.is_set():
-            raise IOError('Recording already started.')
+            if force:
+                log.info('Recording already running. Stopping current recording.')
+                self.handle_stop()
+            else:
+                raise IOError('Recording already started.')
         self.recording.set()
 
     def handle_get_frames_written(self):
@@ -143,5 +143,8 @@ class Video:
         }
 
     def handle_stop(self):
-        self.stop.set()
+        self.recording.clear()
+
+    def handle_shutdown(self):
+        self.stop()
         self.join()
