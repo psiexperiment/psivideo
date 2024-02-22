@@ -65,9 +65,7 @@ class Video:
         self.mgr = mp.Manager()
         self.ctx = self.mgr.Namespace()
         self.ctx.source = source
-        self.ctx.output_filename = None
-        self.ctx.write_start = None
-        self.ctx.write_t0 = None
+        self.reset_ctx()
 
         # Thread synchronization
         self.new_frame = mp.Event()
@@ -75,23 +73,20 @@ class Video:
         module = importlib.import_module(f'psivideo.write_{writer}')
         self.write_cb = getattr(module, 'video_write')
 
+    def reset_ctx(self):
+        self.ctx.output_filename = None
+        self.ctx.write_start = None
+        self.ctx.write_t0 = None
+        self.ctx.capture_ts = None
+
     def start(self):
-        log_queue = mp.Queue(-1)
-        log_cb = partial(configure_worker_logging, log_queue)
-
-        capture_args = (self.ctx, self.process_queue, self.capture_started,
-                        self.stop, log_cb)
-        write_args = (self.ctx, self.write_queue, self.recording, self.stop,
-                      log_cb)
-
+        capture_args = (self, partial(configure_worker_logging, mp.Queue(-1)))
         self._threads = {
             'capture': mp.Process(target=video_capture, name='capture', args=capture_args),
             'process': Thread(target=video_process, args=(self,)),
             'display': Thread(target=video_display, args=(self,)),
-            'write': mp.Process(target=self.write_cb, name='write', args=write_args),
             'tcp': Thread(target=video_tcp, args=(self,)),
-            'log': Thread(target=logging_thread, args=(log_queue,),
-                          daemon=True),
+            'log': Thread(target=logging_thread, args=(log_queue,), daemon=True),
         }
         for name, thread in self._threads.items():
             log.info(f'Starting {thread}')
@@ -107,14 +102,6 @@ class Video:
         # write their own custom processing functions. Deeplabcut anyone?
         return ts, frame
 
-    @property
-    def ts(self):
-        return self.ctx.capture_ts - self.ctx.write_t0
-
-    @property
-    def frames_written(self):
-        return self.ts * self.ctx.fps
-
     def dispatch(self, cmd, **kwargs):
         return getattr(self, f'handle_{cmd}')(**kwargs)
 
@@ -126,7 +113,11 @@ class Video:
     def handle_start(self):
         if self.recording.is_set():
             raise IOError('Recording already started.')
+        write_args = (self.ctx, self.write_queue, self.stop, log_cb)
         self.recording.set()
+        write_args = (self, partial(configure_worker_logging, mp.Queue(-1)))
+        self._threads['write'] = mp.Process(target=self.write_cb, name='write',
+                                            args=write_args)
 
     def handle_get_frames_written(self):
         if not self.recording.is_set():
@@ -136,10 +127,11 @@ class Video:
     def handle_get_timing(self):
         if not self.recording.is_set():
             raise IOError('Recording has not started')
-        ts = self.ts
+        ts = self.ctx.capture_ts - self.ctx.write_t0
+        frames_written = ts * self.ctx.fps
         return {
-            'frame_number': ts * self.ctx.fps,
-            'timestamp': ts
+            'frame_number': frames_written,
+            'timestamp': ts,
         }
 
     def handle_stop(self):

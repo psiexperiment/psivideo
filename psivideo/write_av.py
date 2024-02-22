@@ -4,34 +4,29 @@ import queue
 import av
 
 
-def video_write(ctx, write_queue, recording, stop, log_cb):
+def video_write(video, log_cb):
     log = log_cb()
     log.info('Setting up write')
-
-    while True:
-        if recording.wait(0.1):
-            break
-        if stop.is_set():
-            return
 
     frames_written = 0
     total_frames_dropped = 0
     prior_pts = -1
-    fps = ctx.fps
-    #fps = 30
+    fps = video.ctx.fps
+
     # Ok, it's time to start writing video!
     try:
-        log.info(f'Recording to {ctx.output_filename}')
-        container = av.open(ctx.output_filename, mode='w')
+        log.info(f'Recording to {video.ctx.output_filename}')
+        container = av.open(video.ctx.output_filename, mode='w')
         stream = container.add_stream('mpeg4', rate=fps)
-        stream.width, stream.height = ctx.image_width, ctx.image_height
+        stream.width, stream.height = video.ctx.image_width, video.ctx.image_height
 
+        # Ok, we're ready to start recording
         while True:
             try:
-                ts, frame = write_queue.get(timeout=1)
-                if ctx.write_t0 is None:
-                    ctx.write_t0 = ts
-                ts -= ctx.write_t0
+                ts, frame = video.write_queue.get(timeout=1)
+                if video.ctx.write_t0 is None:
+                    video.ctx.write_t0 = ts
+                ts -= video.ctx.write_t0
                 frame = av.VideoFrame.from_ndarray(frame[..., ::-1], format='rgb24')
 
                 current_pts = int(round(ts * fps))
@@ -50,13 +45,13 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
 
             except queue.Empty:
                 log.error('Queue is empty!')
-                if stop.is_set():
+                if video.stop.is_set():
                     break
     except BrokenPipeError:
         pass
     except Exception as e:
         log.error(str(e))
-        stop.set()
+        video.stop.set()
         raise
     finally:
         try:

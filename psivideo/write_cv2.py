@@ -4,36 +4,30 @@ import queue
 import cv2
 
 
-def video_write(ctx, write_queue, recording, stop, log_cb):
+def video_write(video, log_cb):
     log = log_cb()
     log.info('Setting up write')
-
-    while True:
-        if recording.wait(0.1):
-            break
-        if stop.is_set():
-            return
 
     frames_written = 0
     total_frames_dropped = 0
     prior_pts = -1
-    fps = int(ctx.fps)
-    frame_size = int(ctx.image_width), int(ctx.image_height)
+    fps = int(video.ctx.fps)
+    frame_size = int(video.ctx.image_width), int(video.ctx.image_height)
     # Ok, it's time to start writing video!
     try:
-        log.info(f'Recording to {ctx.output_filename} with fps {fps} and frame size {frame_size}')
+        log.info(f'Recording to {video.ctx.output_filename} with fps {fps} and frame size {frame_size}')
 
-        out = cv2.VideoWriter(ctx.output_filename,
+        out = cv2.VideoWriter(video.ctx.output_filename,
                               cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'),
                               fps,
                               frame_size)
 
         while True:
             try:
-                ts, frame = write_queue.get(timeout=1)
-                if ctx.write_t0 is None:
-                    ctx.write_t0 = ts
-                ts -= ctx.write_t0
+                ts, frame = video.write_queue.get(timeout=1)
+                if video.ctx.write_t0 is None:
+                    video.ctx.write_t0 = ts
+                ts -= video.ctx.write_t0
 
                 current_pts = int(round(ts * fps))
                 if current_pts == prior_pts:
@@ -50,13 +44,13 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
 
             except queue.Empty:
                 log.error('Queue is empty!')
-                if stop.is_set():
+                if video.stop.is_set():
                     break
     except BrokenPipeError:
         pass
     except Exception as e:
         log.error(str(e))
-        stop.set()
+        video.stop.set()
         raise
     finally:
         try:

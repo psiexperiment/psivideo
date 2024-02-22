@@ -10,24 +10,23 @@ def video_capture_profile(*args):
     lp.print_stats()
 
 
-def _video_capture(ctx, queue, capture_started, stop, log_cb):
+def _video_capture(video, log_cb):
     '''
-    Function to execute in a thread that captures video. Basic tests suggest
-    threading is enough and we do not need to go to multiprocessing for speed.
+    Function to execute in a process that captures video.
     '''
     log = log_cb()
     log.info('Setting up capture')
 
-    stream = cv2.VideoCapture(ctx.source)
+    stream = cv2.VideoCapture(video.ctx.source)
     stream.set(cv2.CAP_PROP_FPS, 30.0)
     stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
 
     # Read in some attributes that will be needed later
-    ctx.fps = stream.get(cv2.CAP_PROP_FPS)
-    ctx.image_width = stream.get(cv2.CAP_PROP_FRAME_WIDTH)
-    ctx.image_height = stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    video.ctx.fps = stream.get(cv2.CAP_PROP_FPS)
+    video.ctx.image_width = stream.get(cv2.CAP_PROP_FRAME_WIDTH)
+    video.ctx.image_height = stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-    log.info(f'Actual FPS {ctx.fps}')
+    log.info(f'Actual FPS {video.ctx.fps}')
 
     # For some reason, first capture is very slow. Let's just grab and discard
     # the frame to get it out of the way.
@@ -43,7 +42,7 @@ def _video_capture(ctx, queue, capture_started, stop, log_cb):
     # prevents any other operations from beginning until capture is up and
     # running.
     log.info('Starting capture loop')
-    capture_started.set()
+    video.capture_started.set()
 
     while True:
         try:
@@ -53,17 +52,17 @@ def _video_capture(ctx, queue, capture_started, stop, log_cb):
             if not grabbed:
                 # Something is wrong with the video camera interface
                 break
-            if stop.is_set():
+            if video.stop.is_set():
                 # Time to stop the video
                 break
 
             n_frames += 1
-            queue.put_nowait((capture_ts, frame))
-            ctx.capture_ts = capture_ts
+            video.queue.put_nowait((capture_ts, frame))
+            video.ctx.capture_ts = capture_ts
         except Exception as e:
             # Notify other threads that it's time to stop.
             log.error(str(e))
-            stop.set()
+            video.stop.set()
             raise
 
     stream.release()
@@ -71,5 +70,5 @@ def _video_capture(ctx, queue, capture_started, stop, log_cb):
     log.info(f'Captured {n_frames} frames. Estimated capture rate was {fps:.0f} FPS')
 
 
-# This allows us to switch between the line_profiler and regula version of video_capture
+# This allows us to switch between the line_profiler and regular version of video_capture
 video_capture = _video_capture
