@@ -6,7 +6,7 @@ import json
 import subprocess
 import time
 
-import websockets
+from websockets.asyncio.client import connect
 
 
 class VideoClient:
@@ -29,7 +29,7 @@ class VideoClient:
                 args.extend(['--logging', self.logging])
             process = subprocess.Popen(args)
         uri = f'ws://{self.hostname}:{self.port}'
-        self.ws = await websockets.connect(uri, loop=self.loop, ping_timeout=None)
+        self.ws = await connect(uri, ping_timeout=None)
         log.info(f'Connected to {uri}')
 
     async def disconnect(self):

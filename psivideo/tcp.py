@@ -7,6 +7,7 @@ import json
 
 from threading import Thread
 import websockets
+from websockets.asyncio.server import serve
 
 
 async def handle_connection(video, websocket):
@@ -25,10 +26,9 @@ async def handle_connection(video, websocket):
             await websocket.send(json.dumps(payload))
 
 
-async def run_server(video, loop):
+async def run_server(video):
     cb = partial(handle_connection, video)
-    async with websockets.serve(cb, video.hostname, video.port, loop=loop,
-                                ping_timeout=None):
+    async with serve(cb, video.hostname, video.port, ping_timeout=None):
         while True:
             await asyncio.sleep(0.1)
             if video.stop.is_set():
@@ -36,7 +36,7 @@ async def run_server(video, loop):
 
 
 def start_server(video, loop):
-    loop.run_until_complete(run_server(video, loop))
+    loop.run_until_complete(run_server(video))
 
 
 def video_tcp(video):
