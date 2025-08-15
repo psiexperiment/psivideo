@@ -5,6 +5,7 @@ import asyncio
 import json
 import subprocess
 import time
+import threading
 
 from websockets.asyncio.client import connect
 
@@ -67,6 +68,10 @@ class VideoClient:
 
 class SyncVideoClient(VideoClient):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lock = threading.Lock()
+
     def __enter__(self):
         self.connect()
         return self
@@ -75,20 +80,24 @@ class SyncVideoClient(VideoClient):
         self.disconnect()
 
     def disconnect(self):
-        self.loop.run_until_complete(super().disconnect())
+        with self.lock:
+            self.loop.run_until_complete(super().disconnect())
 
     def connect(self):
-        self.loop.run_until_complete(super().connect())
+        with self.lock:
+            self.loop.run_until_complete(super().connect())
 
     def start(self, filename):
-        log.info('Starting')
-        return self.loop.run_until_complete(super().start(filename))
+        with self.lock:
+            return self.loop.run_until_complete(super().start(filename))
 
     def stop(self):
-        return self.loop.run_until_complete(super().stop())
+        with self.lock:
+            return self.loop.run_until_complete(super().stop())
 
     def get_frames_written(self):
-        return self.loop.run_until_complete(super().get_frames_written())
-
+        with self.lock:
+            return self.loop.run_until_complete(super().get_frames_written())
     def get_timing(self):
-        return self.loop.run_until_complete(super().get_timing())
+        with self.lock:
+            return self.loop.run_until_complete(super().get_timing())
