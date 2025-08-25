@@ -10,7 +10,7 @@ def video_write(ctx, write_queue, recording, stop, log_cb):
     frames_written = 0
     total_frames_dropped = 0
     prior_pts = -1
-    fps = ctx.fps
+    fps = int(ctx.fps)
     # Ok, it's time to start writing video!
     try:
         log.info(f'Recording to {ctx.output_filename}')
