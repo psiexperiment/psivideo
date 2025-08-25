@@ -22,6 +22,7 @@ test = ["pytest"]
 
 [project.scripts]
 psivideo = "psivideo.main:main"
+psivideo-compress-video = "psivideo.postprocess:compress_video"
 
 [build-system]
 requires = ["setuptools>=61.2", "wheel", "setuptools_scm[toml]>=3.4.3"]
