@@ -5,5 +5,3 @@ def video_write(ctx, write_queue, recording, stop, log_cb, write_cb):
             ctx.write_t0 = None
         if stop.is_set():
             return
-
-
