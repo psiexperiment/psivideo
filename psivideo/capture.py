@@ -1,4 +1,5 @@
 import cv2
+import sys
 import time
 
 
@@ -21,13 +22,21 @@ def _video_capture(ctx, queue, capture_started, stop, log_cb):
     stream = cv2.VideoCapture(ctx.source)
     stream.set(cv2.CAP_PROP_FPS, 30.0)
     stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
+    icodec = int(stream.get(cv2.CAP_PROP_FOURCC))
+    codec = icodec.to_bytes(4, byteorder=sys.byteorder).decode()
+
+    if ctx.requested_image_width > 0:
+        log.error('Setting width to {ctx.requested_image_width}')
+        log.error('Setting height to {ctx.requested_image_height}')
+        stream.set(cv2.CAP_PROP_FRAME_WIDTH, ctx.requested_image_width)
+        stream.set(cv2.CAP_PROP_FRAME_HEIGHT, ctx.requested_image_height)
 
     # Read in some attributes that will be needed later
     ctx.fps = stream.get(cv2.CAP_PROP_FPS)
     ctx.image_width = stream.get(cv2.CAP_PROP_FRAME_WIDTH)
     ctx.image_height = stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-    log.info(f'Actual FPS {ctx.fps}')
+    log.info(f'{ctx.image_width}x{ctx.image_height}, actual FPS {ctx.fps}, codec {codec}')
 
     # For some reason, first capture is very slow. Let's just grab and discard
     # the frame to get it out of the way.

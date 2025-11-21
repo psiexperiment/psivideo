@@ -40,9 +40,10 @@ def main():
     parser = ArgumentParser('psivideo')
     parser.add_argument('-s', '--source', default=0, type=int)
     parser.add_argument('-p', '--port', default=33331, type=int)
+    parser.add_argument('--size', type=str)
     args = parser.parse_args()
     logging.config.dictConfig(log_config)
-    video = Video(source=args.source, port=args.port)
+    video = Video(source=args.source, port=args.port, frame_size=args.size)
     video.start()
     video.join()
 

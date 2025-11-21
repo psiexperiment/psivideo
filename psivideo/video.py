@@ -43,12 +43,16 @@ class Video:
         IP address or hostname for server to listen on
     port : number
         Port for server to listen on
+    frame_size : {None, string}
+        If provided, size will be defined in the format WxH, e.g., "320x240".
+        Otherwise, the default size of the camera will be used.
     timebase : fractions.Fraction
         Unit of the PTS. To get the time of the frame relative to video start,
         multiply PTS by timebase.
     '''
 
-    def __init__(self, source=0, hostname='localhost', port=33331, writer='cv2'):
+    def __init__(self, source=0, hostname='localhost', port=33331,
+                 frame_size=None, writer='cv2'):
         # TODO: Don't use indexing for source. Should always point to correct
         # camera even if inputs are swapped.
         vars(self).update(locals())
@@ -68,6 +72,14 @@ class Video:
         self.ctx.source = source
         self.ctx.output_filename = None
         self.ctx.write_t0 = None
+
+        if frame_size is None:
+            self.ctx.requested_image_width = -1
+            self.ctx.requested_image_height = -1
+        else:
+            width, height = frame_size.split('x')
+            self.ctx.requested_image_width = int(width)
+            self.ctx.requested_image_height = int(height)
 
         # Thread synchronization
         self.new_frame = mp.Event()
