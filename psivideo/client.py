@@ -53,8 +53,7 @@ class VideoClient:
         return result
 
     async def start(self, filename):
-        await self.dispatch('set_filename', filename=str(filename))
-        await self.dispatch('start')
+        await self.dispatch('start', filename=str(filename))
 
     async def stop(self):
         return await self.dispatch('stop')
@@ -98,6 +97,7 @@ class SyncVideoClient(VideoClient):
     def get_frames_written(self):
         with self.lock:
             return self.loop.run_until_complete(super().get_frames_written())
+
     def get_timing(self):
         with self.lock:
             return self.loop.run_until_complete(super().get_timing())

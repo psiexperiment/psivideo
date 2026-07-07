@@ -126,18 +126,17 @@ class Video:
     def dispatch(self, cmd, **kwargs):
         return getattr(self, f'handle_{cmd}')(**kwargs)
 
-    def handle_set_filename(self, filename):
-        if self.recording.is_set():
-            raise IOError('Recording already started. Cannot set filename.')
-        self.ctx.output_filename = filename
+    def handle_is_recording(self):
+        return self.recording.is_set()
 
-    def handle_start(self, force=True):
+    def handle_start(self, filename, force=True):
         if self.recording.is_set():
             if force:
                 log.info('Recording already running. Stopping current recording.')
                 self.handle_stop()
             else:
                 raise IOError('Recording already started.')
+        self.ctx.output_filename = filename
         self.recording.set()
 
     def handle_get_frames_written(self):
