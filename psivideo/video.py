@@ -9,6 +9,8 @@ import importlib
 import multiprocessing as mp
 from threading import Event, Lock, Thread
 
+import cv2
+
 from .capture import video_capture
 from .display import video_display
 from .tcp import video_tcp
@@ -84,6 +86,9 @@ class Video:
         # Thread synchronization
         self.new_frame = mp.Event()
 
+        self.overlay_text = ''
+        self.bar_height = 50
+
         module = importlib.import_module(f'psivideo.write_{writer}')
         self.write_cb = getattr(module, 'video_write')
         self.log_queue = mp.Queue(-1)
@@ -106,13 +111,20 @@ class Video:
             thread.start()
             if name == 'capture':
                 self.capture_started.wait()
+                # Once we have the image height, expand it by the bar height.
+                self.ctx.image_height += self.bar_height
 
     def join(self):
         self._threads['capture'].join()
 
     def process_frame(self, ts, frame):
-        # Passthrough, but this method makes it easy for users to subclass and
-        # write their own custom processing functions. Deeplabcut anyone?
+        frame = cv2.copyMakeBorder(frame, self.bar_height, 0, 0, 0,
+                                   cv2.BORDER_CONSTANT, value=(0, 0, 0))
+        if self.overlay_text:
+            # Place text at (x=10, y=35) so it is vertically centered in the 50px bar
+            cv2.putText(frame, self.overlay_text, (10, 35),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1,
+                        cv2.LINE_AA)
         return ts, frame
 
     @property
@@ -159,3 +171,9 @@ class Video:
     def handle_shutdown(self):
         self.stop()
         self.join()
+
+    def handle_show_text(self, text):
+        self.overlay_text = text
+
+    def handle_clear_text(self):
+        self.overlay_text = ''

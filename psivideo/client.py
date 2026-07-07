@@ -64,6 +64,12 @@ class VideoClient:
     async def get_timing(self):
         return await self.dispatch('get_timing')
 
+    async def show_text(self, text):
+        return await self.dispatch('show_text', text=str(text))
+
+    async def clear_text(self):
+        return await self.dispatch('clear_text')
+
 
 class SyncVideoClient(VideoClient):
 
@@ -101,3 +107,11 @@ class SyncVideoClient(VideoClient):
     def get_timing(self):
         with self.lock:
             return self.loop.run_until_complete(super().get_timing())
+
+    def show_text(self, text):
+        with self.lock:
+            return self.loop.run_until_complete(super().show_text(text))
+
+    def clear_text(self):
+        with self.lock:
+            return self.loop.run_until_complete(super().clear_text())
