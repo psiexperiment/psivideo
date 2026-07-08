@@ -121,10 +121,23 @@ class Video:
         frame = cv2.copyMakeBorder(frame, self.bar_height, 0, 0, 0,
                                    cv2.BORDER_CONSTANT, value=(0, 0, 0))
         if self.overlay_text:
-            # Place text at (x=10, y=35) so it is vertically centered in the 50px bar
-            cv2.putText(frame, self.overlay_text, (10, 35),
+            cv2.putText(frame, self.overlay_text, (20, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1,
                         cv2.LINE_AA)
+
+        if self.recording.is_set() and self.ctx.write_t0 is not None:
+            # Calculate elapsed time in seconds for this specific frame
+            elapsed = ts - self.ctx.write_t0
+
+            # Ensure we don't briefly display a negative number due to slight thread delays
+            if elapsed >= 0:
+                # Convert total seconds to Hours, Minutes, Seconds
+                hours, remainder = divmod(elapsed, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                time_str = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+                width = frame.shape[1]
+                cv2.putText(frame, time_str, (width - 100, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         return ts, frame
 
     @property
