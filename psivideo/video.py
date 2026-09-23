@@ -3,11 +3,14 @@ from logging.handlers import QueueHandler, QueueListener
 
 log = logging.getLogger(__name__)
 
+from datetime import datetime
 from fractions import Fraction
 from functools import partial
 import importlib
 import multiprocessing as mp
+from pathlib import Path
 from threading import Event, Lock, Thread
+import time
 
 import cv2
 
@@ -89,6 +92,11 @@ class Video:
         self.overlay_text = ''
         self.bar_height = 50
 
+        # Folder that snapshots are saved to. Set by the client (e.g.,
+        # psiexperiment) once it knows where the experiment data are saved.
+        self.data_folder = None
+        self.last_snapshot_time = None
+
         module = importlib.import_module(f'psivideo.write_{writer}')
         self.write_cb = getattr(module, 'video_write')
         self.log_queue = mp.Queue(-1)
@@ -140,6 +148,27 @@ class Video:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         return ts, frame
 
+    def save_snapshot(self):
+        if self.data_folder is None:
+            log.warning('No data folder set. Snapshot not saved.')
+            return None
+        if self.current_frame is None:
+            return None
+        # Drop the overlay bar so the snapshot contains only the camera image.
+        frame = self.current_frame[self.bar_height:]
+        folder = Path(self.data_folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        filename = folder / f'snapshot_{datetime.now():%Y%m%d-%H%M%S-%f}.png'
+        # cv2.imwrite silently fails on non-ASCII paths on Windows, so encode
+        # in memory and write the bytes ourselves.
+        ok, buffer = cv2.imencode('.png', frame)
+        if not ok:
+            raise IOError('Unable to encode snapshot')
+        filename.write_bytes(buffer.tobytes())
+        self.last_snapshot_time = time.monotonic()
+        log.info(f'Saved snapshot to {filename}')
+        return filename
+
     @property
     def ts(self):
         return self.ctx.capture_ts - self.ctx.write_t0
@@ -190,3 +219,6 @@ class Video:
 
     def handle_clear_text(self):
         self.overlay_text = ''
+
+    def handle_set_data_folder(self, path):
+        self.data_folder = path

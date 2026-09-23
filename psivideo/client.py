@@ -70,6 +70,11 @@ class VideoClient:
     async def clear_text(self):
         return await self.dispatch('clear_text')
 
+    async def set_data_folder(self, path):
+        # None clears the folder, which disables snapshots.
+        path = None if path is None else str(path)
+        return await self.dispatch('set_data_folder', path=path)
+
 
 class SyncVideoClient(VideoClient):
 
@@ -115,3 +120,7 @@ class SyncVideoClient(VideoClient):
     def clear_text(self):
         with self.lock:
             return self.loop.run_until_complete(super().clear_text())
+
+    def set_data_folder(self, path):
+        with self.lock:
+            return self.loop.run_until_complete(super().set_data_folder(path))
