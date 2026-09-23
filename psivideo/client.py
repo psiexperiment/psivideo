@@ -75,10 +75,16 @@ class VideoClient:
         path = None if path is None else str(path)
         return await self.dispatch('set_data_folder', path=path)
 
-    async def snapshot(self, label=None):
-        # Saved as snapshot_<date time>_<label>.png. Returns the filename
-        # saved, or None if no data folder is set.
-        return await self.dispatch('snapshot', label=label)
+    async def snapshot(self, label=None, experiment_ts=None):
+        # Saved as snapshot_<date time>_t<experiment_ts>s_<label>.png. If
+        # experiment_ts is omitted, the server estimates it from the last
+        # offset sent via set_experiment_offset. Returns the filename saved,
+        # or None if no data folder is set.
+        return await self.dispatch('snapshot', label=label,
+                                   experiment_ts=experiment_ts)
+
+    async def set_experiment_offset(self, offset):
+        return await self.dispatch('set_experiment_offset', offset=offset)
 
 
 class SyncVideoClient(VideoClient):
@@ -130,6 +136,12 @@ class SyncVideoClient(VideoClient):
         with self.lock:
             return self.loop.run_until_complete(super().set_data_folder(path))
 
-    def snapshot(self, label=None):
+    def snapshot(self, label=None, experiment_ts=None):
         with self.lock:
-            return self.loop.run_until_complete(super().snapshot(label))
+            return self.loop.run_until_complete(
+                super().snapshot(label, experiment_ts))
+
+    def set_experiment_offset(self, offset):
+        with self.lock:
+            return self.loop.run_until_complete(
+                super().set_experiment_offset(offset))

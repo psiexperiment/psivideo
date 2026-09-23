@@ -5,6 +5,7 @@ log = logging.getLogger(__name__)
 
 from datetime import datetime
 from fractions import Fraction
+import math
 from functools import partial
 import importlib
 import multiprocessing as mp
@@ -62,6 +63,7 @@ class Video:
         # camera even if inputs are swapped.
         vars(self).update(locals())
         self.current_frame = None
+        self.current_ts = None
         self.frames_discarded = 0
 
         # Process synchronization
@@ -96,6 +98,11 @@ class Video:
         # psiexperiment) once it knows where the experiment data are saved.
         self.data_folder = None
         self.last_snapshot_time = None
+
+        # Client clock (e.g., psiexperiment) minus recording time. Updated
+        # periodically by the client while recording so snapshots can be
+        # named with the experiment time.
+        self.experiment_offset = None
 
         module = importlib.import_module(f'psivideo.write_{writer}')
         self.write_cb = getattr(module, 'video_write')
@@ -148,7 +155,15 @@ class Video:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         return ts, frame
 
-    def save_snapshot(self, label=None):
+    def frame_experiment_ts(self):
+        if self.experiment_offset is None or not self.recording.is_set():
+            return None
+        t0 = self.ctx.write_t0
+        if t0 is None or self.current_ts is None:
+            return None
+        return self.current_ts - t0 + self.experiment_offset
+
+    def save_snapshot(self, label=None, experiment_ts=None):
         if self.data_folder is None:
             log.warning('No data folder set. Snapshot not saved.')
             return None
@@ -158,8 +173,12 @@ class Video:
         frame = self.current_frame[self.bar_height:]
         folder = Path(self.data_folder)
         folder.mkdir(parents=True, exist_ok=True)
+        if experiment_ts is None:
+            experiment_ts = self.frame_experiment_ts()
         # Label goes after the timestamp so snapshots sort chronologically.
         name = f'snapshot_{datetime.now():%Y%m%d-%H%M%S-%f}'
+        if experiment_ts is not None and math.isfinite(experiment_ts):
+            name = f'{name}_t{experiment_ts:.3f}s'
         if label:
             name = f'{name}_{label}'
         filename = folder / f'{name}.png'
@@ -195,6 +214,7 @@ class Video:
             else:
                 raise IOError('Recording already started.')
         self.ctx.output_filename = filename
+        self.experiment_offset = None
         self.recording.set()
 
     def handle_get_frames_written(self):
@@ -213,6 +233,7 @@ class Video:
 
     def handle_stop(self):
         self.recording.clear()
+        self.experiment_offset = None
 
     def handle_shutdown(self):
         self.stop()
@@ -227,6 +248,9 @@ class Video:
     def handle_set_data_folder(self, path):
         self.data_folder = path
 
-    def handle_snapshot(self, label=None):
-        filename = self.save_snapshot(label)
+    def handle_set_experiment_offset(self, offset):
+        self.experiment_offset = offset
+
+    def handle_snapshot(self, label=None, experiment_ts=None):
+        filename = self.save_snapshot(label, experiment_ts)
         return None if filename is None else str(filename)

@@ -10,6 +10,7 @@ def video_process(video):
 
                 # This will be shown as the online video. The `new_frame` event
                 # will notify the video thread to update the image. 
+                video.current_ts = ts
                 video.current_frame = frame
                 video.new_frame.set()
 
