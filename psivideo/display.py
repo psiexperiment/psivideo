@@ -7,9 +7,9 @@ import time
 import cv2
 
 
-# Snapshot icon lives in the overlay bar, just left of the recording timer.
+# Snapshot icon lives at the far right of the overlay bar.
 # Offsets are from the right edge of the frame.
-SNAPSHOT_X_OFFSET = 130
+SNAPSHOT_X_OFFSET = 25
 SNAPSHOT_Y = 25
 SNAPSHOT_HIT_HALF_WIDTH = 15
 SNAPSHOT_HIT_HALF_HEIGHT = 14
@@ -58,7 +58,7 @@ def video_display(video):
                 display_frame = video.current_frame.copy()
                 width = display_frame.shape[1]
                 if video.recording.is_set():
-                    cv2.circle(display_frame, (width - 25, 25), 7, (0, 0, 255), -1)
+                    cv2.circle(display_frame, (width - 60, 25), 7, (0, 0, 255), -1)
                 draw_camera_icon(display_frame, snapshot_icon_color(video))
                 cv2.imshow('Video', display_frame)
                 video.new_frame.clear()

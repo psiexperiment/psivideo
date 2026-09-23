@@ -75,6 +75,10 @@ class VideoClient:
         path = None if path is None else str(path)
         return await self.dispatch('set_data_folder', path=path)
 
+    async def snapshot(self, prefix='snapshot'):
+        # Returns the filename saved, or None if no data folder is set.
+        return await self.dispatch('snapshot', prefix=prefix)
+
 
 class SyncVideoClient(VideoClient):
 
@@ -124,3 +128,7 @@ class SyncVideoClient(VideoClient):
     def set_data_folder(self, path):
         with self.lock:
             return self.loop.run_until_complete(super().set_data_folder(path))
+
+    def snapshot(self, prefix='snapshot'):
+        with self.lock:
+            return self.loop.run_until_complete(super().snapshot(prefix))

@@ -144,11 +144,11 @@ class Video:
                 minutes, seconds = divmod(remainder, 60)
                 time_str = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
                 width = frame.shape[1]
-                cv2.putText(frame, time_str, (width - 100, 30),
+                cv2.putText(frame, time_str, (width - 135, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         return ts, frame
 
-    def save_snapshot(self):
+    def save_snapshot(self, prefix='snapshot'):
         if self.data_folder is None:
             log.warning('No data folder set. Snapshot not saved.')
             return None
@@ -158,7 +158,7 @@ class Video:
         frame = self.current_frame[self.bar_height:]
         folder = Path(self.data_folder)
         folder.mkdir(parents=True, exist_ok=True)
-        filename = folder / f'snapshot_{datetime.now():%Y%m%d-%H%M%S-%f}.png'
+        filename = folder / f'{prefix}_{datetime.now():%Y%m%d-%H%M%S-%f}.png'
         # cv2.imwrite silently fails on non-ASCII paths on Windows, so encode
         # in memory and write the bytes ourselves.
         ok, buffer = cv2.imencode('.png', frame)
@@ -222,3 +222,7 @@ class Video:
 
     def handle_set_data_folder(self, path):
         self.data_folder = path
+
+    def handle_snapshot(self, prefix='snapshot'):
+        filename = self.save_snapshot(prefix)
+        return None if filename is None else str(filename)
