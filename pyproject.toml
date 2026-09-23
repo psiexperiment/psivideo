@@ -24,6 +24,12 @@ test = ["pytest"]
 psivideo = "psivideo.main:main"
 psivideo-compress-video = "psivideo.postprocess:compress_video"
 
+[tool.setuptools.package-data]
+psivideo = [
+    "icons/*.ico",
+    "icons/*.png",
+]
+
 [build-system]
 requires = ["setuptools>=61.2", "wheel", "setuptools_scm[toml]>=3.4.3"]
 build-backend = "setuptools.build_meta"

@@ -1,5 +1,6 @@
 import logging.config
 
+from .branding import set_app_id
 from .video import Video
 
 
@@ -43,6 +44,9 @@ def main():
     parser.add_argument('--size', type=str)
     args = parser.parse_args()
     logging.config.dictConfig(log_config)
+    # Before the video window exists, which is when Windows binds the process
+    # to a taskbar button.
+    set_app_id()
     video = Video(source=args.source, port=args.port, frame_size=args.size)
     video.start()
     video.join()

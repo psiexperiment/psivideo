@@ -6,6 +6,11 @@ import time
 
 import cv2
 
+from .branding import set_window_icon
+
+
+#: Name of the display window, which is also its title.
+WINDOW_NAME = 'psivideo'
 
 # Snapshot icon lives at the far right of the overlay bar.
 # Offsets are from the right edge of the frame.
@@ -50,8 +55,11 @@ def on_mouse(video, event, x, y, flags, param):
 
 
 def video_display(video):
-    cv2.namedWindow('Video')
-    cv2.setMouseCallback('Video', partial(on_mouse, video))
+    cv2.namedWindow(WINDOW_NAME)
+    # After namedWindow, which is what creates the window, and before the
+    # first frame, so the window is never shown with the default icon.
+    set_window_icon(WINDOW_NAME)
+    cv2.setMouseCallback(WINDOW_NAME, partial(on_mouse, video))
     while not video.stop.is_set():
         try:
             if video.new_frame.wait(1):
@@ -60,7 +68,7 @@ def video_display(video):
                 if video.recording.is_set():
                     cv2.circle(display_frame, (width - 60, 25), 7, (0, 0, 255), -1)
                 draw_camera_icon(display_frame, snapshot_icon_color(video))
-                cv2.imshow('Video', display_frame)
+                cv2.imshow(WINDOW_NAME, display_frame)
                 video.new_frame.clear()
                 if cv2.waitKey(1) == ord('q'):
                     video.stop.set()
