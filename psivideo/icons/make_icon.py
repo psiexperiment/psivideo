@@ -1,8 +1,10 @@
 # Generates main-icon.png and main-icon.ico. Run from anywhere:
 #   python make_icon.py
 #
-# The frame, palette and output sizes come from psiapp.icons, shared with the
-# other psi programs (pip install psiapp[icons]). Only the motif is drawn here:
+# The frame, palette and output sizes come from psi.launcher.icons, shared with
+# the other psi programs. That makes psiexperiment (pip install
+# psiexperiment[icons]) a requirement for running this script only -- psivideo
+# itself does not depend on psi. Only the motif is drawn here:
 # a camera seen head-on, where cftscal's icon has a chirp and noise-exp's has
 # noise. It echoes the camera glyph `psivideo.display` draws over the video
 # window, so the taskbar button and the window agree on what the program is.
@@ -16,7 +18,7 @@ from pathlib import Path
 
 from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
 
-from psiapp.icons import FILL, FOREGROUND, make_icon
+from psi.launcher.icons import FILL, FOREGROUND, make_icon
 
 
 HERE = Path(__file__).parent

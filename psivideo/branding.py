@@ -52,10 +52,9 @@ def set_app_id(app_id=APP_ID):
     '''
     Give this process its own identity on the Windows taskbar.
 
-    Deliberately duplicates `psiapp.util.set_app_id` (and the copy of it in
-    `psi.application`) rather than importing it: psiapp is built on
-    psiexperiment, which is built on psivideo, so psivideo cannot depend on
-    either. Keep the three in sync by hand.
+    Deliberately duplicates `psi.core.app_id.set_app_id` rather than
+    importing it: psivideo is a stand-alone program that psi paradigms talk
+    to, and does not depend on psiexperiment. Keep the two in sync by hand.
 
     Call this before the first window is created; afterwards Windows has
     already bound the process to the default ID and it has no effect.
