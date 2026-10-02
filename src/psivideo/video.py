@@ -8,6 +8,7 @@ from fractions import Fraction
 import math
 from functools import partial
 import importlib
+import itertools
 import multiprocessing as mp
 from pathlib import Path
 from threading import Event, Lock, Thread
@@ -55,10 +56,13 @@ class Video:
     timebase : fractions.Fraction
         Unit of the PTS. To get the time of the frame relative to video start,
         multiply PTS by timebase.
+    writer : {'av', 'cv2'}
+        Backend for saving video. 'av' compresses with H.265 as it records
+        (saved as MP4). 'cv2' saves Motion JPEG, which is much larger.
     '''
 
     def __init__(self, source=0, hostname='localhost', port=33331,
-                 frame_size=None, writer='cv2'):
+                 frame_size=None, writer='av'):
         # TODO: Don't use indexing for source. Should always point to correct
         # camera even if inputs are swapped.
         vars(self).update(locals())
@@ -77,8 +81,12 @@ class Video:
         self.mgr = mp.Manager()
         self.ctx = self.mgr.Namespace()
         self.ctx.source = source
-        self.ctx.output_filename = None
         self.ctx.write_t0 = None
+
+        # (id, filename) of the current recording. The id distinguishes
+        # back-to-back recordings, even when they reuse a filename.
+        self.recording_session = None
+        self._recording_ids = itertools.count()
 
         if frame_size is None:
             self.ctx.requested_image_width = -1
@@ -105,13 +113,13 @@ class Video:
         self.experiment_offset = None
 
         module = importlib.import_module(f'psivideo.write_{writer}')
-        self.write_cb = getattr(module, 'video_write')
+        self.writer_class = getattr(module, 'Writer')
         self.log_queue = mp.Queue(-1)
 
     def start(self):
         log_cb = partial(configure_worker_logging, self.log_queue)
         capture_args = (self.ctx, self.process_queue, self.capture_started, self.stop, log_cb)
-        write_args = (self.ctx, self.write_queue, self.recording, self.stop, log_cb, self.write_cb)
+        write_args = (self.ctx, self.write_queue, self.stop, log_cb, self.writer_class)
 
         self._threads = {
             'capture': mp.Process(target=video_capture, name='capture', args=capture_args),
@@ -213,7 +221,7 @@ class Video:
                 self.handle_stop()
             else:
                 raise IOError('Recording already started.')
-        self.ctx.output_filename = filename
+        self.recording_session = (next(self._recording_ids), filename)
         self.experiment_offset = None
         self.recording.set()
 

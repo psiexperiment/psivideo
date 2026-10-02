@@ -1,61 +1,58 @@
-import queue
+from pathlib import Path
 
 import av
 
 
-def video_write(ctx, write_queue, recording, stop, log_cb):
-    log = log_cb()
-    log.info('Setting up write')
+# Equivalent to `ffmpeg -vcodec libx265 -crf 28` (ffmpeg's default preset is
+# medium). Encoding is done on the fly, so no post-processing is needed.
+CODEC = 'libx265'
+CODEC_OPTIONS = {
+    'crf': '28',
+    'preset': 'medium',
+    'x265-params': 'log-level=error',
+}
 
-    frames_written = 0
-    total_frames_dropped = 0
-    prior_pts = -1
-    fps = int(ctx.fps)
-    # Ok, it's time to start writing video!
-    try:
-        log.info(f'Recording to {ctx.output_filename}')
-        container = av.open(ctx.output_filename, mode='w')
-        stream = container.add_stream('mpeg4', rate=fps)
-        stream.width, stream.height = ctx.image_width, ctx.image_height
+# Fragmented MP4 writes the index as it goes rather than at the end, so the
+# file is still readable (up to the last keyframe) if psivideo crashes.
+CONTAINER_OPTIONS = {
+    'movflags': 'frag_keyframe+empty_moov+default_base_moof',
+}
 
-        while True:
-            try:
-                ts, frame = write_queue.get(timeout=1)
-                if ctx.write_t0 is None:
-                    ctx.write_t0 = ts
-                ts -= ctx.write_t0
-                frame = av.VideoFrame.from_ndarray(frame[..., ::-1], format='rgb24')
 
-                current_pts = int(round(ts * fps))
-                if current_pts == prior_pts:
-                    log.info('Skipping write')
-                    continue
-                elif (current_pts - prior_pts) > 1:
-                    frames_dropped = current_pts - prior_pts - 1
-                    log.warning(f'Dropped {frames_dropped} frames before frame {current_pts}.')
-                    total_frames_dropped += frames_dropped
-                for pts in range(prior_pts, current_pts):
-                    frames_written += 1
-                    frame.pts = pts + 1
-                    container.mux(stream.encode(frame))
-                prior_pts = current_pts
+def output_filename(filename, log):
+    # AVI can't hold H.265, so switch to MP4.
+    filename = Path(filename)
+    if filename.suffix.lower() != '.mp4':
+        new_filename = filename.with_suffix('.mp4')
+        log.warning(f'Saving as {new_filename} rather than {filename} since '
+                    f'{CODEC} requires an MP4 container.')
+        filename = new_filename
+    return str(filename)
 
-            except queue.Empty:
-                log.error('Queue is empty!')
-                if stop.is_set():
-                    break
-    except BrokenPipeError:
-        pass
-    except Exception as e:
-        log.error(str(e))
-        stop.set()
-        raise
-    finally:
+
+class Writer:
+
+    def __init__(self, filename, fps, width, height, log):
+        filename = output_filename(filename, log)
+        log.info(f'Recording to {filename}')
+        self.container = av.open(filename, mode='w', options=CONTAINER_OPTIONS)
         try:
-            # If the error occured when creating the container, it won't exist!
-            container.close()
+            self.stream = self.container.add_stream(CODEC, rate=fps,
+                                                    options=CODEC_OPTIONS)
+            self.stream.width, self.stream.height = width, height
+            self.stream.pix_fmt = 'yuv420p'
         except:
-            pass
+            self.container.close()
+            raise
 
-    log.info(f'{total_frames_dropped} dropped frames.')
-    log.info(f'Wrote {frames_written} frames.')
+    def write(self, pts, frame):
+        frame = av.VideoFrame.from_ndarray(frame, format='bgr24')
+        frame.pts = pts
+        self.container.mux(self.stream.encode(frame))
+
+    def close(self):
+        try:
+            # Flush frames still buffered in the encoder.
+            self.container.mux(self.stream.encode())
+        finally:
+            self.container.close()
