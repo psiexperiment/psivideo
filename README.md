@@ -15,6 +15,8 @@ This comes with both the server and client. You'll primarily be working with the
 
 To quit, select the video window and hit thq "q" key.
 
+To run the server without opening a console window (on Windows), launch it with `psivideow` instead of `psivideo`. Since there is no console, the log is written to `psivideo.log` in the system temp folder (override with `--log-file`). When the client launches the server, pass `console=False` to `VideoClient` to do the same.
+
 Design
 ------
 

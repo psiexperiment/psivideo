@@ -24,6 +24,9 @@ test = ["pytest"]
 psivideo = "psivideo.main:main"
 psivideo-compress-video = "psivideo.postprocess:compress_video"
 
+[project.gui-scripts]
+psivideow = "psivideo.main:main_gui"
+
 [tool.setuptools.package-data]
 psivideo = [
     "icons/*.ico",

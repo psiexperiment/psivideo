@@ -4,6 +4,7 @@ log = logging.getLogger(__name__)
 import asyncio
 import json
 import subprocess
+import sys
 import time
 import threading
 
@@ -12,10 +13,11 @@ from websockets.asyncio.client import connect
 
 class VideoClient:
 
-    def __init__(self, launch=False, logging=None, hostname='localhost',
-                 port=33331):
+    def __init__(self, launch=False, log_file=None, hostname='localhost',
+                 port=33331, console=True):
         self.launch = launch
-        self.logging = logging
+        self.console = console
+        self.log_file = log_file
         self.hostname = hostname
         self.port = port
         try:
@@ -25,10 +27,13 @@ class VideoClient:
 
     async def connect(self):
         if self.launch:
-            args = ['psivideo', '-p', self.port]
-            if self.logging is not None:
-                args.extend(['--logging', self.logging])
-            process = subprocess.Popen(args)
+            args = ['psivideo', '-p', str(self.port)]
+            if self.log_file is not None:
+                args.extend(['--log-file', str(self.log_file)])
+            kwargs = {}
+            if not self.console and sys.platform == 'win32':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            process = subprocess.Popen(args, **kwargs)
         uri = f'ws://{self.hostname}:{self.port}'
         self.ws = await connect(uri, ping_timeout=None)
         log.info(f'Connected to {uri}')
