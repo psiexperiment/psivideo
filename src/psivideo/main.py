@@ -49,6 +49,9 @@ def main(default_log_file=None):
     parser.add_argument('--writer', default='av', choices=['av', 'cv2'],
                         help='av compresses with H.265 while recording; '
                         'cv2 saves much larger Motion JPEG AVI files.')
+    parser.add_argument('-o', '--output', type=Path,
+                        help='Start recording to this file as soon as the '
+                        'camera starts (mainly for testing).')
     parser.add_argument('--log-file', type=Path, default=default_log_file,
                         help='Write the log to this file instead of the '
                         'console.')
@@ -69,6 +72,8 @@ def main(default_log_file=None):
     video = Video(source=args.source, port=args.port, frame_size=args.size,
                   writer=args.writer)
     video.start()
+    if args.output is not None:
+        video.handle_start(str(args.output))
     video.join()
 
 
