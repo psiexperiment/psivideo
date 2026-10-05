@@ -18,6 +18,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
+# For the psiexperiment plugin in `psivideo/plugin.enaml`.
+psi = ["psiexperiment"]
 test = ["pytest"]
 
 [project.scripts]

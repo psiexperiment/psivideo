@@ -17,6 +17,11 @@ To quit, select the video window and hit thq "q" key.
 
 To run the server without opening a console window (on Windows), launch it with `psivideow` instead of `psivideo`. Since there is no console, the log is written to `psivideo.log` in the system temp folder (override with `--log-file`). When the client launches the server, pass `console=False` to `VideoClient` to do the same.
 
+Recording from psiexperiment
+----------------------------
+
+Add `psivideo.plugin.PSIVideo` to a paradigm to save the video (`recording.mp4`, or `recording.avi` with `--writer cv2`) to the experiment folder, along with `recording_timestamp.csv`, which logs the video frame number and timestamp against the experiment clock once a second. Install with `pip install psivideo[psi]`. The plugin connects to a server that is already running; it does not start one, so start `psivideo` (or `psivideow`) before the experiment. Use `port` and `filename` to record from more than one camera.
+
 Design
 ------
 
