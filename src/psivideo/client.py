@@ -35,7 +35,16 @@ class VideoClient:
                 kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
             process = subprocess.Popen(args, **kwargs)
         uri = f'ws://{self.hostname}:{self.port}'
-        self.ws = await connect(uri, ping_timeout=None)
+        try:
+            self.ws = await connect(uri, ping_timeout=None)
+        except OSError as e:
+            # A refused connection almost always means the server is not
+            # running, but the OS error (e.g., WinError 1225) does not say so.
+            raise ConnectionError(
+                f'Unable to connect to the psivideo server at {uri}. '
+                'Is psivideo running? Start it (psivideo or psivideow) and '
+                f'try again.\n\n({e})'
+            ) from e
         log.info(f'Connected to {uri}')
 
     async def disconnect(self):
